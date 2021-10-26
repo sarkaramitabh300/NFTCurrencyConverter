@@ -42,7 +42,7 @@ class Data {
   int id;
   String symbol;
   String name;
-  int amount;
+  num amount;
   DateTime lastUpdated;
   Quote quote;
 

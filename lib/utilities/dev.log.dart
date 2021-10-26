@@ -73,7 +73,7 @@ abstract class Dev {
       }
 
       buffer.writeAll(
-          [functionName, className ?? 'Class Name', fileName], ' ==> ');
+          [functionName, className, fileName], ' ==> ');
 
       log.d(buffer);
 
