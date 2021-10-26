@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:currency_calculator/pojo/CoinToINR.dart';
 import 'package:currency_calculator/pojo/CoinToUSD.dart';
 import 'package:currency_calculator/pojo/alcormarket_response.dart';
-import 'package:currency_calculator/pojo/curencry_converter_response.dart';
 import 'package:currency_calculator/utilities/strings.dart';
 import 'package:dio/dio.dart';
 import 'package:currency_calculator/utilities/dev.log.dart';
@@ -19,8 +18,9 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  String INR_UNIT = "INR";
   var dio;
+  String INR_UNIT = "INR";
+
   String USD_UNIT = "USD";
   final _formKey = GlobalKey<FormBuilderState>();
 
@@ -28,9 +28,9 @@ class _HomeState extends State<Home> {
 
   var currencyOptions = ["INR", "USD"];
 
-  String convertedPriceINR = "45.89";
+  String convertedPriceINR = "";
 
-  String convertedPriceUSD = "45.89";
+  String convertedPriceUSD = "";
 
   double estimatedAmount = 0.0;
 
@@ -40,25 +40,58 @@ class _HomeState extends State<Home> {
 
   String convertedUnit = "";
 
-  double fwgPrice = 0.0;
+  bool isLoadingInrPrice = false;
+  bool isLoadingCryptoPrice = false;
 
-  double fwwPrice = 0.0;
-  double fwfPrice = 0.0;
+  late Map<String, dynamic> inputAmount;
+
+  bool isLoadingCryptoPriceUsd = false;
+
+  bool isLoadingCryptoPriceINR = false;
 
   @override
   void initState() {
     dio = Dio();
-    getUsdToINR();
-    getAllFarmersWorldData();
+    _refreshData();
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(),
-      body: bodyUI(),
+      appBar: AppBar(
+        title: const Text('CryptoConverter'),
+        actions: [
+          !isLoadingInrPrice
+              ? Padding(
+                  padding: const EdgeInsets.only(right: 20.0),
+                  child: GestureDetector(
+                    onTap: () {
+                      _refreshData();
+                    },
+                    child: const Icon(
+                      Icons.refresh,
+                      size: 26.0,
+                    ),
+                  ))
+              : const Padding(
+                  padding: EdgeInsets.only(right: 20.0),
+                  child: Icon(
+                    Icons.av_timer,
+                    size: 26.0,
+                  ),
+                ),
+        ],
+      ),
+      body: Container(
+        color: Colors.black12,
+        child: bodyUI(),
+      ),
     );
+  }
+
+  _refreshData() async {
+    getUsdToINR();
   }
 
   bodyUI() {
@@ -73,7 +106,6 @@ class _HomeState extends State<Home> {
                     children: [
                       cryptoConverter(),
                       currencyConverter(),
-                      resourceList()
                     ],
                   )),
             ],
@@ -98,7 +130,8 @@ class _HomeState extends State<Home> {
     getEstimatedAmountUSD(double.parse(data['qty']), data['coin']);
   }
 
-  getUsdToINR() {
+  Future<void> getUsdToINR() async {
+    isLoadingInrPrice = true;
     var params = {'amount': 1, 'symbol': "USD", 'convert': "INR"};
     var header = {
       'Content-Type': 'application/json',
@@ -108,20 +141,19 @@ class _HomeState extends State<Home> {
     var url = 'https://pro-api.coinmarketcap.com/v1/tools/price-conversion';
     Dev.debug('getEstimatedAmount : $url');
     Dev.debug('params : $params');
-    dio
-        .get(url, options: Options(headers: header), queryParameters: params)
-        .then((response) {
-      var currencyResponse = CoinToInr.fromJson(response.data);
+    var response = await dio.get(url,
+        options: Options(headers: header), queryParameters: params);
+    var currencyResponse = CoinToInr.fromJson(response.data);
 
-      setState(() {
-        currentINRPrice = currencyResponse.data.quote.inr.price;
-      });
-      Dev.debug(currencyResponse.data.quote.inr.price);
+    Dev.debug(currencyResponse.data.quote.inr.price);
+    setState(() {
+      currentINRPrice = currencyResponse.data.quote.inr.price;
+      isLoadingInrPrice = false;
     });
-    // .catchError((error) => handleHttpError(error));
   }
 
   getEstimatedAmountINR(double unpaidEth, String fromCurrency) {
+    isLoadingCryptoPriceINR = true;
     var params = {
       'amount': unpaidEth,
       'symbol': fromCurrency,
@@ -133,23 +165,26 @@ class _HomeState extends State<Home> {
       'Accept-Encoding': 'deflate, gzip'
     };
     var url = 'https://pro-api.coinmarketcap.com/v1/tools/price-conversion';
-    Dev.debug('getEstimatedAmount : $url');
-    Dev.debug('params : $params');
+    Dev.debug('getEstimatedAmountINR : $url');
+    Dev.debug('getEstimatedAmountINR params : $params');
     dio
         .get(url, options: Options(headers: header), queryParameters: params)
         .then((response) {
       var currencyResponse = CoinToInr.fromJson(response.data);
 
       setState(() {
+        isLoadingCryptoPriceINR = false;
         convertedPriceINR =
-            currencyResponse.data.quote.inr.price.toStringAsFixed(2);
+            currencyResponse.data.quote.inr.price.toStringAsFixed(4);
       });
-      Dev.debug(currencyResponse.data.quote.inr.price);
+      Dev.debug(
+          'getEstimatedAmountINR Price Inr : ${currencyResponse.data.quote.inr.price}');
     });
     // .catchError((error) => handleHttpError(error));
   }
 
   getEstimatedAmountUSD(double unpaidEth, String fromCurrency) {
+    isLoadingCryptoPriceUsd = true;
     var params = {
       'amount': unpaidEth,
       'symbol': fromCurrency,
@@ -161,20 +196,21 @@ class _HomeState extends State<Home> {
       'Accept-Encoding': 'deflate, gzip'
     };
     var url = 'https://pro-api.coinmarketcap.com/v1/tools/price-conversion';
-    Dev.debug('getEstimatedAmount : $url');
-    Dev.debug('params : $params');
+    Dev.debug('getEstimatedAmountUSD : $url');
+    Dev.debug('getEstimatedAmountUSD params : $params');
     dio
         .get(url, options: Options(headers: header), queryParameters: params)
         .then((response) {
       var currencyResponse = CoinToUsd.fromJson(response.data);
 
       setState(() {
+        isLoadingCryptoPriceUsd = false;
         convertedPriceUSD =
             currencyResponse.data.quote.usd.price.toStringAsFixed(2);
       });
-      Dev.debug(currencyResponse.data.quote.usd.price);
+      Dev.debug(
+          "getEstimatedAmountUSD Price USD :${currencyResponse.data.quote.usd.price}");
     });
-    // .catchError((error) => handleHttpError(error));
   }
 
   handleHttpError(DioError error) {
@@ -184,243 +220,281 @@ class _HomeState extends State<Home> {
   }
 
   cryptoConverter() {
-    return Container(
-      // height: 200,
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15.0),
-          ),
-          color: const Color.fromARGB(255, 63, 55, 201),
-          elevation: 10,
-          child: Column(children: [
-            ListTile(
-              // leading: Icon(Icons.album, size: 70),
-              title: Text('1 USD = ${currentINRPrice.toStringAsFixed(2)} INR',
-                  style: const TextStyle(color: Colors.white)),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                SizedBox(
-                  width: 100,
-                  child: FormBuilderDropdown(
-                    name: 'coin',
-                    decoration: const InputDecoration(
-                        labelText: 'Coin',
-                        labelStyle: TextStyle(color: Colors.white)),
-                    initialValue: coinOptions.first,
-                    allowClear: false,
-                    hint: const Text('Select',
-                        style: TextStyle(color: Colors.white)),
-                    dropdownColor: const Color.fromARGB(255, 181, 23, 158),
-                    validator: FormBuilderValidators.compose(
-                        [FormBuilderValidators.required(context)]),
-                    items: coinOptions
-                        .map((coin) => DropdownMenuItem(
-                              value: coin,
-                              child: Text(coin,
-                                  style: const TextStyle(color: Colors.white)),
-                            ))
-                        .toList(),
-                  ),
-                ),
-                SizedBox(
-                  width: 100,
-                  child: FormBuilderTextField(
-                    name: 'qty',
-                    decoration: const InputDecoration(
-                      labelText: 'Quantity',
-                      labelStyle: TextStyle(color: Colors.white),
-                    ),
-                    initialValue: "1",
-
-                    onChanged: _onChanged,
-                    style: const TextStyle(color: Colors.white),
-                    // valueTransformer: (text) => num.tryParse(text),
-                    validator: FormBuilderValidators.compose([
-                      FormBuilderValidators.required(context),
-                      FormBuilderValidators.numeric(context),
-                    ]),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(
-              height: 30,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(convertedPriceUSD,
-                    style: const TextStyle(color: Colors.white)),
-                SizedBox(
-                  width: 2,
-                ),
-                Text(USD_UNIT, style: const TextStyle(color: Colors.white)),
-                const SizedBox(
-                  width: 100,
-                ),
-                Text(convertedPriceINR,
-                    style: const TextStyle(color: Colors.white)),
-                SizedBox(
-                  width: 2,
-                ),
-                Text(INR_UNIT, style: const TextStyle(color: Colors.white)),
-              ],
-            ),
-            const SizedBox(
-              height: 20,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                SizedBox(
-                  width: 100,
-                  child: MaterialButton(
-                    color: Color.fromARGB(255, 67, 97, 238),
-                    child: const Text(
-                      "Submit",
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    onPressed: () {
-                      _formKey.currentState!.save();
-                      if (_formKey.currentState!.validate()) {
-                        Dev.debug(_formKey.currentState!.value);
-                        fetchCryptoData();
-                      } else {
-                        Dev.debug("validation failed");
-                      }
-                    },
-                  ),
-                ),
-              ],
-            )
-          ]),
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15.0),
         ),
+        color: const Color.fromARGB(255, 63, 55, 201),
+        elevation: 10,
+        child: Column(children: [
+          conversionRate(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              SizedBox(
+                width: 100,
+                child: FormBuilderDropdown(
+                  name: 'coin',
+                  decoration: const InputDecoration(
+                      labelText: 'Coin',
+                      labelStyle: TextStyle(color: Colors.white)),
+                  initialValue: coinOptions.first,
+                  allowClear: false,
+                  hint: const Text('Select',
+                      style: TextStyle(color: Colors.white)),
+                  dropdownColor: const Color.fromARGB(255, 181, 23, 158),
+                  validator: FormBuilderValidators.compose(
+                      [FormBuilderValidators.required(context)]),
+                  items: coinOptions
+                      .map((coin) => DropdownMenuItem(
+                            value: coin,
+                            child: Text(coin,
+                                style: const TextStyle(color: Colors.white)),
+                          ))
+                      .toList(),
+                ),
+              ),
+              SizedBox(
+                width: 100,
+                child: FormBuilderTextField(
+                  name: 'qty',
+                  decoration: const InputDecoration(
+                    labelText: 'Quantity',
+                    labelStyle: TextStyle(color: Colors.white),
+                  ),
+                  initialValue: "1",
+
+                  onChanged: _onChanged,
+                  style: const TextStyle(color: Colors.white),
+                  // valueTransformer: (text) => num.tryParse(text),
+                  validator: FormBuilderValidators.compose([
+                    FormBuilderValidators.required(context),
+                    FormBuilderValidators.numeric(context),
+                  ]),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(
+            height: 30,
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              isLoadingCryptoPriceUsd
+                  ? getCircularProgressIndicator(20)
+                  : Row(
+                      children: [
+                        Text(convertedPriceUSD,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(
+                          width: 2,
+                        ),
+                        Text(USD_UNIT,
+                            style: const TextStyle(color: Colors.white)),
+                        IconButton(
+                          enableFeedback: true,
+                          onPressed: () {
+                            copyToClipBoard(convertedPriceUSD);
+                          },
+                          icon: const Icon(
+                            Icons.copy,
+                            size: 16.0,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+              const SizedBox(
+                width: 50,
+              ),
+              isLoadingCryptoPriceINR
+                  ? getCircularProgressIndicator(20)
+                  : Row(
+                      children: [
+                        Text(convertedPriceINR,
+                            style: const TextStyle(color: Colors.white)),
+                        const SizedBox(
+                          width: 2,
+                        ),
+                        Text(INR_UNIT,
+                            style: const TextStyle(color: Colors.white)),
+                        IconButton(
+                          enableFeedback: true,
+                          onPressed: () {
+                            copyToClipBoard(INR_UNIT);
+                          },
+                          icon: const Icon(
+                            Icons.copy,
+                            size: 16.0,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+            ],
+          ),
+          const SizedBox(
+            height: 20,
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              SizedBox(
+                width: 100,
+                child: MaterialButton(
+                  color: Color.fromARGB(255, 67, 97, 238),
+                  child: const Text(
+                    "Submit",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onPressed: () {
+                    _formKey.currentState!.save();
+                    if (_formKey.currentState!.validate()) {
+                      Dev.debug(_formKey.currentState!.value);
+                      fetchCryptoData();
+                    } else {
+                      Dev.debug("validation failed");
+                    }
+                  },
+                ),
+              ),
+            ],
+          )
+        ]),
       ),
     );
   }
 
   currencyConverter() {
-    return Container(
-      // height: 200,
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15.0),
-          ),
-          color: const Color.fromARGB(255, 58, 12, 163),
-          elevation: 10,
-          child: Column(children: [
-            ListTile(
-              // leading: Icon(Icons.album, size: 70),
-              title: Text('1 USD = ${currentINRPrice.toStringAsFixed(2)} INR',
-                  style: const TextStyle(color: Colors.white)),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 100,
-                  child: FormBuilderTextField(
-                    name: 'currencyQty',
-
-                    decoration: const InputDecoration(
-                      labelText: ' ',
-                      labelStyle: TextStyle(color: Colors.white),
-                    ),
-                    initialValue: "1",
-                    style: const TextStyle(color: Colors.white),
-                    onChanged: _onChanged,
-                    // valueTransformer: (text) => num.tryParse(text),
-                    validator: FormBuilderValidators.compose([
-                      FormBuilderValidators.required(context),
-                      FormBuilderValidators.numeric(context),
-                    ]),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                SizedBox(
-                  width: 100,
-                  child: FormBuilderDropdown(
-                    name: 'currency',
-                    decoration: const InputDecoration(
-                      labelText: 'Currency',
-                      labelStyle: TextStyle(color: Colors.white),
-                    ),
-                    style: const TextStyle(color: Colors.white),
-                    initialValue: currencyOptions.first,
-                    allowClear: false,
-                    hint: const Text('Select',
-                        style: const TextStyle(color: Colors.white)),
-                    validator: FormBuilderValidators.compose(
-                        [FormBuilderValidators.required(context)]),
-                    items: currencyOptions
-                        .map((currency) => DropdownMenuItem(
-                              value: currency,
-                              child: Text(currency,
-                                  style: const TextStyle(color: Colors.white)),
-                            ))
-                        .toList(),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(
-              height: 30,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text("      "),
-                const Text("         "),
-                const SizedBox(
-                  width: 100,
-                ),
-                Text(calculatedPrice,
-                    style: const TextStyle(color: Colors.white)),
-                const SizedBox(
-                  width: 2,
-                ),
-                Text(convertedUnit,
-                    style: const TextStyle(color: Colors.white)),
-              ],
-            ),
-            const SizedBox(
-              height: 20,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                SizedBox(
-                  width: 100,
-                  child: MaterialButton(
-                    color: Color.fromARGB(255, 67, 97, 238),
-                    child: const Text(
-                      "Submit",
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    onPressed: () {
-                      _formKey.currentState!.save();
-                      if (_formKey.currentState!.validate()) {
-                        Dev.debug(_formKey.currentState!.value);
-                        Map<String, dynamic> data =
-                            _formKey.currentState!.value;
-                        calculatePrice(data);
-                      } else {
-                        Dev.debug("validation failed");
-                      }
-                    },
-                  ),
-                ),
-              ],
-            )
-          ]),
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15.0),
         ),
+        color: const Color.fromARGB(255, 58, 12, 163),
+        elevation: 10,
+        child: Column(children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 100,
+                child: FormBuilderTextField(
+                  name: 'currencyQty',
+
+                  decoration: const InputDecoration(
+                    labelText: 'Amount',
+                    labelStyle: TextStyle(color: Colors.white),
+                  ),
+                  initialValue: "1",
+                  style: const TextStyle(color: Colors.white),
+                  onChanged: _onChanged,
+                  // valueTransformer: (text) => num.tryParse(text),
+                  validator: FormBuilderValidators.compose([
+                    FormBuilderValidators.required(context),
+                    FormBuilderValidators.numeric(context),
+                  ]),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              SizedBox(
+                width: 100,
+                child: FormBuilderDropdown(
+                  name: 'currency',
+                  decoration: const InputDecoration(
+                    labelText: 'Currency',
+                    labelStyle: TextStyle(color: Colors.white),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  initialValue: currencyOptions.first,
+                  allowClear: false,
+                  onChanged: _calculateConversion,
+                  dropdownColor: const Color.fromARGB(255, 181, 23, 158),
+                  hint: const Text('Select',
+                      style: TextStyle(color: Colors.white)),
+                  validator: FormBuilderValidators.compose(
+                      [FormBuilderValidators.required(context)]),
+                  items: currencyOptions
+                      .map((currency) => DropdownMenuItem(
+                            value: currency,
+                            child: Text(currency,
+                                style: const TextStyle(color: Colors.white)),
+                          ))
+                      .toList(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(
+            height: 30,
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text("      "),
+              const Text("         "),
+              const SizedBox(
+                width: 100,
+              ),
+              Row(
+                children: [
+                  Text(calculatedPrice,
+                      style: const TextStyle(color: Colors.white)),
+                  const SizedBox(
+                    width: 2,
+                  ),
+                  Text(convertedUnit,
+                      style: const TextStyle(color: Colors.white)),
+                  IconButton(
+                    enableFeedback: true,
+                    onPressed: () {
+                      copyToClipBoard(calculatedPrice);
+                    },
+                    icon: const Icon(
+                      Icons.copy,
+                      size: 16.0,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(
+            height: 20,
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              SizedBox(
+                width: 100,
+                child: MaterialButton(
+                  color: const Color.fromARGB(255, 67, 97, 238),
+                  child: const Text(
+                    "Submit",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onPressed: () {
+                    // _formKey.currentState!.save();
+                    // if (_formKey.currentState!.validate()) {
+                    //   Dev.debug(_formKey.currentState!.value);
+                    //   Map<String, dynamic> data =
+                    //       _formKey.currentState!.value;
+                    //   calculatePrice(data);
+                    // } else {
+                    //   Dev.debug("validation failed");
+                    // }
+                  },
+                ),
+              ),
+            ],
+          )
+        ]),
       ),
     );
   }
@@ -439,122 +513,61 @@ class _HomeState extends State<Home> {
     });
   }
 
-  resourceList() {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 20.0),
-      height: 100.0,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: <Widget>[
-          SizedBox(
-            width: 160.0,
-            child: Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15.0),
-              ),
-              color: const Color.fromARGB(255, 181, 23, 158),
-              elevation: 10,
-              child: Column(children: [
-                ListTile(
-                  leading: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Image.asset('assets/logo/fwg_farmerstoken.png'),
-                  ),
-                  title:
-                      const Text('Gold', style: TextStyle(color: Colors.white)),
-                  subtitle:
-                      const Text('FWG', style: TextStyle(color: Colors.white)),
-                ),
-                Text(fwgPrice.toStringAsFixed(3),
-                    style: const TextStyle(color: Colors.white)),
-              ]),
-            ),
-          ),
-          SizedBox(
-            width: 160.0,
-            child: Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15.0),
-              ),
-              color: const Color.fromARGB(255, 114, 9, 183),
-              elevation: 10,
-              child: Column(children: [
-                ListTile(
-                  leading: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Image.asset('assets/logo/fwf_farmerstoken.png'),
-                  ),
-                  title:
-                      const Text('Food', style: TextStyle(color: Colors.white)),
-                  subtitle:
-                      const Text('FWF', style: TextStyle(color: Colors.white)),
-                ),
-                Text(fwfPrice.toStringAsFixed(3),
-                    style: const TextStyle(color: Colors.white)),
-              ]),
-            ),
-          ),
-          SizedBox(
-            width: 160.0,
-            child: Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15.0),
-              ),
-              color: const Color.fromARGB(255, 95, 13, 123),
-              elevation: 10,
-              child: Column(children: [
-                ListTile(
-                  leading: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Image.asset('assets/logo/fww_farmerstoken.png'),
-                  ),
-                  title:
-                      const Text('Wood', style: TextStyle(color: Colors.white)),
-                  subtitle:
-                      const Text('FWW', style: TextStyle(color: Colors.white)),
-                ),
-                Text(fwwPrice.toStringAsFixed(3),
-                    style: const TextStyle(color: Colors.white)),
-              ]),
-            ),
-          ),
-          // Container(
-          //   width: 160.0,
-          //   color: Colors.yellow,
-          // ),
-          // Container(
-          //   width: 160.0,
-          //   color: Colors.orange,
-          // ),
+  copyToClipBoard(String text) {
+    Dev.debug("copied $text");
+    Clipboard.setData(ClipboardData(text: text));
+  }
+
+  // void setGlobalLoadingDataState() {
+  //   if (isLoadingFwfPrice &&
+  //       isLoadingFwgPrice &&
+  //       isLoadingFwwPrice &&
+  //       isLoadingInrPrice) {
+  //     setState(() {
+  //       isLoadingGlobalData = true;
+  //     });
+  //   } else {
+  //     setState(() {
+  //       isLoadingGlobalData = false;
+  //     });
+  //   }
+  // }
+
+  getCircularProgressIndicator(double size) {
+    return Center(
+      child: SleekCircularSlider(
+        appearance: CircularSliderAppearance(
+          size: size,
+          spinnerMode: true,
+        ),
+      ),
+    );
+  }
+
+  conversionRate() {
+    return ListTile(
+      // leading: Icon(Icons.album, size: 70),
+      title: Row(
+        children: [
+          const Text('1 USD = ', style: TextStyle(color: Colors.white)),
+          isLoadingInrPrice
+              ? getCircularProgressIndicator(20.0)
+              : Text('${currentINRPrice.toStringAsFixed(2)} INR',
+                  style: const TextStyle(color: Colors.white)),
         ],
       ),
     );
   }
 
-  Future<double> getFWPrice(String api) async {
-    var header = {
-      'Content-Type': 'application/json',
-    };
-    // var url = fwf_api;
-    Dev.debug('getEstimatedAmount : $api');
-
-    var response = await dio.get(api, options: Options(headers: header));
-    var alcorResponse = AlcorMarketResponse.fromJson(response.data);
-    Dev.info("response : ${alcorResponse.lastPrice}");
-    if (alcorResponse.lastPrice != null) {
-      return alcorResponse.lastPrice;
+  void _calculateConversion(String? value) {
+    Dev.debug("_calculateConversion  $value");
+    _formKey.currentState!.save();
+    if (_formKey.currentState!.validate()) {
+      Dev.debug(_formKey.currentState!.value);
+      Map<String, dynamic> data = _formKey.currentState!.value;
+      calculatePrice(data);
     } else {
-      return 0.0;
+      Dev.debug("validation failed");
     }
-  }
-
-  Future<void> getAllFarmersWorldData() async {
-    fwgPrice = await getFWPrice(fwg_api);
-    fwwPrice = await getFWPrice(fww_api);
-    fwfPrice = await getFWPrice(fwf_api);
-  }
-
-  copyToClipBoard(String text) {
-    Clipboard.setData(ClipboardData(text: text));
   }
 }

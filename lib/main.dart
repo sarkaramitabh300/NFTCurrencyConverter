@@ -1,5 +1,8 @@
 import 'package:currency_calculator/screens/home.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+
+import 'CurvedNavBar.dart';
 
 void main() {
   runApp(const MyApp());
@@ -14,12 +17,9 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-
         primarySwatch: Colors.deepPurple,
       ),
-      home: const Home(),
+      home: BottomNavBar(),
     );
   }
 }
-
-
