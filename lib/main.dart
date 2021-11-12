@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'CurvedNavBar.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 

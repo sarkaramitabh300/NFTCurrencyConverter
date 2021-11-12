@@ -35,3 +35,4 @@ const Map<String, dynamic> fw_ac_tools_body = {
   "reverse": false,
   "show_payer": false
 };
+const String rupeeSymbol='₹';

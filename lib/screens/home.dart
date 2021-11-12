@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:currency_calculator/pojo/CoinToINR.dart';
 import 'package:currency_calculator/pojo/CoinToUSD.dart';
 import 'package:currency_calculator/pojo/alcormarket_response.dart';
+import 'package:currency_calculator/utilities/constant.dart';
 import 'package:currency_calculator/utilities/strings.dart';
 import 'package:dio/dio.dart';
 import 'package:currency_calculator/utilities/dev.log.dart';
@@ -532,17 +533,6 @@ class _HomeState extends State<Home> {
   //     });
   //   }
   // }
-
-  getCircularProgressIndicator(double size) {
-    return Center(
-      child: SleekCircularSlider(
-        appearance: CircularSliderAppearance(
-          size: size,
-          spinnerMode: true,
-        ),
-      ),
-    );
-  }
 
   conversionRate() {
     return ListTile(

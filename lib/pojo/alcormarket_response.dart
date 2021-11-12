@@ -16,7 +16,6 @@ class AlcorMarketResponse {
     required this.quoteToken,
     required this.minBuy,
     required this.minSell,
-    required this.frozen,
     required this.fee,
     required this.lastPrice,
     required this.volume24,
@@ -31,7 +30,6 @@ class AlcorMarketResponse {
   EToken quoteToken;
   String minBuy;
   String minSell;
-  int frozen;
   int fee;
   double lastPrice;
   double volume24;
@@ -46,7 +44,6 @@ class AlcorMarketResponse {
     quoteToken: EToken.fromJson(json["quote_token"]),
     minBuy: json["min_buy"],
     minSell: json["min_sell"],
-    frozen: json["frozen"],
     fee: json["fee"],
     lastPrice: json["last_price"].toDouble(),
     volume24: json["volume24"].toDouble(),
@@ -62,7 +59,6 @@ class AlcorMarketResponse {
     "quote_token": quoteToken.toJson(),
     "min_buy": minBuy,
     "min_sell": minSell,
-    "frozen": frozen,
     "fee": fee,
     "last_price": lastPrice,
     "volume24": volume24,
